@@ -47,6 +47,22 @@
             >
             <span class="form-hint">最大20人</span>
           </div>
+          <div class="form-group">
+            <label>红包皮肤</label>
+            <div class="skin-selector">
+              <div 
+                v-for="skin in packetSkins" 
+                :key="skin.id"
+                class="skin-option"
+                :class="{ 'selected': currentSkin === skin.id }"
+                :style="{ borderColor: skin.color }"
+                @click="currentSkin = skin.id"
+              >
+                <div class="skin-preview" :style="{ backgroundColor: skin.color }"></div>
+                <span class="skin-name">{{ skin.name }}</span>
+              </div>
+            </div>
+          </div>
           <button class="modal-btn" @click="saveSettings">开始抢红包</button>
         </div>
       </div>
@@ -55,16 +71,17 @@
     <!-- 红包元素 -->
     <div 
       class="red-packet"
-      :class="{ 'opened': isOpened }"
+      :class="{ 'opened': isOpened, [`skin-${getActualSkin().id}`]: true }"
+      :style="{ backgroundColor: getActualSkin().color }"
       @click="openPacket"
       v-if="!isOpened && !showResult && !showAllOpened && !showSettings"
     >
       <!-- 红包封口 -->
-      <div class="packet-seal"></div>
+      <div class="packet-seal" :style="{ backgroundColor: getSealColor() }"></div>
       <!-- 金色圆形开启按钮 -->
       <div class="open-button">開</div>
       <!-- 红包文字 -->
-      <div class="packet-text">红包</div>
+      <div class="packet-text">{{ getActualSkin().text }}</div>
       <!-- 红包信息 -->
       <div class="packet-info">
         <div class="packet-info-text">{{ totalUsers - receivedList.length }}/{{ totalUsers }}</div>
@@ -168,7 +185,15 @@ export default {
         openRedPacket: null, // 打开红包音效
         showMoney: null,     // 显示金额音效
         celebration: null    // 庆祝音效
-      }
+      },
+      // 红包皮肤相关
+      currentSkin: 'normal', // 当前选择的红包皮肤
+      packetSkins: [         // 可用的红包皮肤列表
+        { id: 'normal', name: '普通红包', color: '#e63946', text: '红包' },
+        { id: 'birthday', name: '生日红包', color: '#ffb703', text: '生日快乐' },
+        { id: 'festival', name: '节日红包', color: '#2a9d8f', text: '节日快乐' },
+        { id: 'random', name: '随机皮肤', color: '#8338ec', text: '神秘红包' }
+      ]
     };
   },
   created() {
@@ -490,6 +515,32 @@ export default {
       
       // 隐藏设置界面
       this.showSettings = false;
+    },
+    
+    // 获取实际使用的皮肤（处理随机皮肤）
+    getActualSkin() {
+      if (this.currentSkin === 'random') {
+        // 随机选择一个非随机皮肤
+        const nonRandomSkins = this.packetSkins.filter(skin => skin.id !== 'random');
+        return nonRandomSkins[Math.floor(Math.random() * nonRandomSkins.length)];
+      }
+      return this.packetSkins.find(skin => skin.id === this.currentSkin) || this.packetSkins[0];
+    },
+    
+    // 获取封口颜色
+    getSealColor() {
+      const skin = this.getActualSkin();
+      // 根据不同皮肤返回对应的封口颜色
+      switch(skin.id) {
+        case 'normal':
+          return '#c1121f';
+        case 'birthday':
+          return '#fb8500';
+        case 'festival':
+          return '#264653';
+        default:
+          return '#c1121f';
+      }
     }
   }
 };
@@ -518,6 +569,61 @@ export default {
   cursor: pointer;
   transition: all 0.5s ease;
   transform-origin: center top; /* 以顶部为旋转原点 */
+}
+
+/* 不同皮肤的渐变效果 */
+.red-packet.skin-normal {
+  background: linear-gradient(135deg, #e63946 0%, #d62828 100%);
+}
+
+.red-packet.skin-birthday {
+  background: linear-gradient(135deg, #ffb703 0%, #fb8500 100%);
+}
+
+.red-packet.skin-festival {
+  background: linear-gradient(135deg, #2a9d8f 0%, #264653 100%);
+}
+
+/* 皮肤选择器样式 */
+.skin-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.skin-option {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.skin-option:hover {
+  border-color: #e63946;
+  transform: translateY(-2px);
+}
+
+.skin-option.selected {
+  background-color: rgba(230, 57, 70, 0.1);
+  border-color: #e63946;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.skin-preview {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  margin-right: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.skin-name {
+  font-size: 14px;
+  color: #333;
 }
 
 /* 红包打开动画 */
@@ -571,7 +677,7 @@ export default {
   left: 50%;
   transform: translate(-50%, -50%);
   color: #fff;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: bold;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
