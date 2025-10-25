@@ -85,7 +85,28 @@
       <!-- 红包信息 -->
       <div class="packet-info">
         <div class="packet-info-text">{{ totalUsers - receivedList.length }}/{{ totalUsers }}</div>
-          </div>
+      </div>
+    </div>
+    
+    <!-- 粒子效果容器 -->
+    <div class="particles-container" v-if="isOpened && !showResult && !showAllOpened">
+      <div 
+        class="particle" 
+        v-for="(particle, index) in particles" 
+        :key="index"
+        :style="{
+          left: particle.left + 'px',
+          top: particle.top + 'px',
+          width: particle.size + 'px',
+          height: particle.size + 'px',
+          background: particle.color,
+          animationDelay: particle.delay + 's',
+          animationDuration: particle.duration + 's',
+          '--endX': particle.endX + 'px',
+          '--endY': particle.endY + 'px',
+          '--rotate': particle.rotate + 'deg'
+        }"
+      ></div>
     </div>
     
     <!-- 金币飞散效果（动态生成） -->
@@ -180,6 +201,9 @@ export default {
       currentUser: '',      // 当前抢红包的用户
       bestLucky: { user: '', money: 0 },  // 手气最佳
       worstLucky: { user: '', money: 999 }, // 运气最差
+      // 动画相关
+      animationPhase: 0, // 动画阶段
+      particles: [], // 粒子效果
       // 音效对象
       sounds: {
         openRedPacket: null, // 打开红包音效
@@ -212,13 +236,17 @@ export default {
         window.speechSynthesis.cancel();
       }
       
+      // 重置动画状态
+      this.resetAnimationState();
+      
       this.isOpened = false;
       this.showResult = false;
       this.showAllOpened = false;
       this.coins = [];
       this.remainingMoney = this.totalMoney;
       this.receivedList = [];
-      // 注意：不重置我的红包记录，让记录一直保留
+      // 重置我的红包记录，每次重新开始
+      this.myRedPackets = [];
       this.bestLucky = { user: '', money: 0 };
       this.worstLucky = { user: '', money: 999 };
       // 重置时显示设置界面
@@ -228,6 +256,12 @@ export default {
       this.inputUsers = this.totalUsers;
       // 重置后隐藏记录面板，需要重新打开红包才会显示
       this.showRedPacketList = false;
+    },
+    
+    // 重置动画状态
+    resetAnimationState() {
+      this.animationPhase = 0;
+      this.particles = [];
     },
     // 初始化音效
     initSounds() {
@@ -302,7 +336,7 @@ export default {
       }
     },
     
-    // 打开红包
+    // 打开红包 - 实现分阶段动画
     openPacket() {
       if (this.isOpened) return;
       
@@ -317,8 +351,14 @@ export default {
       // 标记红包为打开状态（触发动画）
       this.isOpened = true;
       
-      // 生成金币飞散数据（15个金币）
-      this.generateCoins(15);
+      // 生成粒子效果
+      this.generateParticles();
+      
+      // 动画延迟后生成金币飞散效果（模拟红包展开后的效果）
+      setTimeout(() => {
+        // 生成金币飞散数据（15个金币）
+        this.generateCoins(15);
+      }, 300);
       
       // 计算本次抢到的金额
       this.calculateMoney();
@@ -348,6 +388,42 @@ export default {
           this.showResult = true;
         }
       }, 1500);
+    },
+    
+    // 生成粒子效果
+    generateParticles() {
+      this.particles = [];
+      const particleCount = 100; // 粒子数量
+      const colors = ['#ffd700', '#ffb347', '#ff6b6b', '#4cc9f0', '#f72585'];
+      const centerX = window.innerWidth / 2;
+      const centerY = window.innerHeight / 2;
+      
+      // 根据红包皮肤调整颜色
+      const skin = this.getActualSkin();
+      const skinColor = skin.color;
+      colors.push(skinColor);
+      
+      for (let i = 0; i < particleCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = Math.random() * 300 + 100;
+        const size = Math.random() * 8 + 4;
+        const delay = Math.random() * 0.5;
+        const duration = Math.random() * 1 + 1;
+        const endX = Math.cos(angle) * distance;
+        const endY = Math.sin(angle) * distance + (Math.random() - 0.5) * 100;
+        
+        this.particles.push({
+          left: centerX - size / 2,
+          top: centerY - size / 2,
+          size: size,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          delay: delay,
+          duration: duration,
+          endX: endX,
+          endY: endY,
+          rotate: Math.random() * 720 - 360 // 随机旋转角度
+        });
+      }
     },
     
     // 随机选择一个未抢红包的用户
@@ -568,7 +644,7 @@ export default {
   box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
   cursor: pointer;
   transition: all 0.5s ease;
-  transform-origin: center top; /* 以顶部为旋转原点 */
+  transform-origin: center top;
 }
 
 /* 不同皮肤的渐变效果 */
@@ -582,6 +658,13 @@ export default {
 
 .red-packet.skin-festival {
   background: linear-gradient(135deg, #2a9d8f 0%, #264653 100%);
+}
+
+/* 红包打开动画 */
+.red-packet.opened {
+  transform: rotateX(180deg) translateY(20px);
+  opacity: 0;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
 }
 
 /* 皮肤选择器样式 */
@@ -626,11 +709,39 @@ export default {
   color: #333;
 }
 
-/* 红包打开动画 */
-.red-packet.opened {
-  transform: rotateX(180deg) translateY(20px);
+/* 粒子效果容器 */
+.particles-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 50;
+}
+
+/* 粒子样式 */
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  animation: particleExplosion 2s cubic-bezier(0.19, 1, 0.22, 1) forwards;
   opacity: 0;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+/* 粒子爆炸动画 */
+@keyframes particleExplosion {
+  0% {
+    transform: translate(0, 0) scale(0) rotate(0deg);
+    opacity: 1;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--endX), var(--endY)) scale(1) rotate(var(--rotate));
+    opacity: 0;
+  }
 }
 
 /* 红包封口 */
