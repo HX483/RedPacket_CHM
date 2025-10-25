@@ -1,5 +1,21 @@
 <template>
   <div class="red-packet-container">
+    <!-- 我的红包记录列表 -->
+    <div class="my-red-packets" v-if="showRedPacketList">
+      <div class="my-red-packets-title">红包记录</div>
+      <div class="my-red-packets-list">
+        <div v-if="myRedPackets.length === 0" class="empty-record">暂无记录</div>
+        <div 
+          v-for="(packet, index) in myRedPackets" 
+          :key="index" 
+          class="my-red-packet-item"
+        >
+          <div class="packet-user">{{ packet.user }}</div>
+          <div class="packet-time">{{ formatTimestamp(packet.timestamp) }}</div>
+          <div class="packet-amount">¥{{ packet.money.toFixed(2) }}</div>
+        </div>
+      </div>
+    </div>
     <!-- 设置界面 -->
     <div class="settings-modal" v-if="showSettings">
       <div class="modal-content">
@@ -130,6 +146,7 @@ export default {
       showResult: false,    // 是否显示单次结果弹窗
       showAllOpened: false, // 是否显示所有红包抢完的结果
       showSettings: true,   // 是否显示设置界面
+      showRedPacketList: false, // 是否显示红包记录列表
       money: 0,             // 抢到的金额
       coins: [],            // 金币动画数据
       totalMoney: 100,      // 总金额（元）
@@ -138,6 +155,7 @@ export default {
       inputUsers: 5,        // 输入的总人数
       remainingMoney: 100,  // 剩余金额
       receivedList: [],     // 已抢红包列表
+      myRedPackets: [],     // 我的红包记录
       users: [              // 模拟群聊用户
         '我', '小明', '小红', '小李', '小王', '小张', '小刘', '小陈', '小周', '小林',
         '小美', '小丽', '小海', '大山', '小风', '小雨', '小花', '小朵', '小龙', '小虎'
@@ -148,6 +166,25 @@ export default {
     };
   },
   methods: {
+    // 重置游戏（可再次抢红包）
+    resetGame() {
+      this.isOpened = false;
+      this.showResult = false;
+      this.showAllOpened = false;
+      this.coins = [];
+      this.remainingMoney = this.totalMoney;
+      this.receivedList = [];
+      // 注意：不重置我的红包记录，让记录一直保留
+      this.bestLucky = { user: '', money: 0 };
+      this.worstLucky = { user: '', money: 999 };
+      // 重置时显示设置界面
+      this.showSettings = true;
+      // 重置输入框为当前值
+      this.inputMoney = this.totalMoney;
+      this.inputUsers = this.totalUsers;
+      // 重置后隐藏记录面板，需要重新打开红包才会显示
+      this.showRedPacketList = false;
+    },
     // 打开红包
     openPacket() {
       if (this.isOpened) return;
@@ -221,6 +258,25 @@ export default {
         user: this.currentUser,
         money: parseFloat(this.money)
       });
+      
+      // 每次打开红包都记录，并显示记录面板
+      this.myRedPackets.push({
+        user: this.currentUser,
+        money: parseFloat(this.money),
+        timestamp: new Date().getTime()
+      });
+      
+      // 第一次打开红包后显示记录面板
+      this.showRedPacketList = true;
+    },
+    
+    // 格式化时间戳为可读时间
+    formatTimestamp(timestamp) {
+      const date = new Date(timestamp);
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      return `${hours}:${minutes}:${seconds}`;
     },
     
     // 计算手气最佳和运气最差
@@ -280,6 +336,7 @@ export default {
       this.coins = [];
       this.remainingMoney = this.totalMoney;
       this.receivedList = [];
+      // 注意：不重置我的红包记录，让记录一直保留
       this.bestLucky = { user: '', money: 0 };
       this.worstLucky = { user: '', money: 999 };
       // 重置时显示设置界面
@@ -287,6 +344,8 @@ export default {
       // 重置输入框为当前值
       this.inputMoney = this.totalMoney;
       this.inputUsers = this.totalUsers;
+      // 重置后隐藏记录面板，需要重新打开红包才会显示
+      this.showRedPacketList = false;
     },
     
     // 保存设置
@@ -424,7 +483,93 @@ export default {
   font-size: 16px;
 }
 
+/* 我的红包记录样式 */
+.my-red-packets {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 200px;
+  max-height: 70vh;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  z-index: 50;
+}
 
+.my-red-packets-title {
+  padding: 15px;
+  background: #e63946;
+  color: white;
+  font-weight: bold;
+  font-size: 16px;
+  text-align: center;
+}
+
+.my-red-packets-list {
+  max-height: calc(70vh - 50px);
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.my-red-packet-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.my-red-packet-item:hover {
+  background: #e9ecef;
+  transform: translateX(-2px);
+}
+
+.packet-user {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  flex: 0 0 auto;
+  margin-right: 10px;
+}
+
+.packet-time {
+  font-size: 12px;
+  color: #666;
+  flex: 1;
+  text-align: center;
+}
+
+.packet-amount {
+  font-size: 16px;
+  font-weight: bold;
+  color: #d62828;
+  flex: 0 0 auto;
+  margin-left: 10px;
+}
+
+.empty-record {
+  text-align: center;
+  padding: 20px;
+  color: #999;
+  font-size: 14px;
+}
 
 /* 金币样式 */
 .coin {
