@@ -162,12 +162,31 @@ export default {
       ],
       currentUser: '',      // 当前抢红包的用户
       bestLucky: { user: '', money: 0 },  // 手气最佳
-      worstLucky: { user: '', money: 999 } // 运气最差
+      worstLucky: { user: '', money: 999 }, // 运气最差
+      // 音效对象
+      sounds: {
+        openRedPacket: null, // 打开红包音效
+        showMoney: null,     // 显示金额音效
+        celebration: null    // 庆祝音效
+      }
     };
+  },
+  created() {
+    // 初始化音效
+    this.initSounds();
+  },
+  beforeUnmount() {
+    // 清理音效资源
+    this.cleanupSounds();
   },
   methods: {
     // 重置游戏（可再次抢红包）
     resetGame() {
+      // 停止正在进行的语音播报
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      
       this.isOpened = false;
       this.showResult = false;
       this.showAllOpened = false;
@@ -185,12 +204,90 @@ export default {
       // 重置后隐藏记录面板，需要重新打开红包才会显示
       this.showRedPacketList = false;
     },
+    // 初始化音效
+    initSounds() {
+      try {
+        // 创建音效对象（使用 AudioContext 和 OscillatorNode 生成音效，避免外部文件依赖）
+        this.sounds.openRedPacket = { play: () => this.generateSound(800, 300, 0.15) };
+        this.sounds.showMoney = { play: () => this.generateSound(1000, 1200, 0.3, 0.1) };
+        this.sounds.celebration = { play: () => {
+          this.generateSound(1500, 2000, 0.2);
+          setTimeout(() => this.generateSound(1800, 2200, 0.2), 100);
+          setTimeout(() => this.generateSound(2000, 2500, 0.2), 200);
+        }};
+      } catch (error) {
+        console.log('音效初始化失败:', error);
+      }
+    },
+    
+    // 清理音效资源
+    cleanupSounds() {
+      // 清理音效相关资源
+    },
+    
+    // 生成音效（使用Web Audio API）
+    generateSound(freqStart, freqEnd, duration, type = 'sine') {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        
+        const context = new AudioContext();
+        const oscillator = context.createOscillator();
+        const gainNode = context.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(context.destination);
+        
+        // 设置音效类型
+        oscillator.type = type;
+        
+        // 设置频率渐变
+        oscillator.frequency.setValueAtTime(freqStart, context.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(freqEnd, context.currentTime + duration);
+        
+        // 设置音量渐变
+        gainNode.gain.setValueAtTime(0.1, context.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + duration);
+        
+        oscillator.start();
+        oscillator.stop(context.currentTime + duration);
+      } catch (error) {
+        console.log('生成音效失败:', error);
+      }
+    },
+    
+    // 语音播报金额
+    speakAmount(amount, user) {
+      try {
+        if ('speechSynthesis' in window) {
+          const utterance = new SpeechSynthesisUtterance();
+          utterance.text = `${user}抢到了${amount}元`;
+          utterance.lang = 'zh-CN';
+          utterance.volume = 1;
+          utterance.rate = 1;
+          utterance.pitch = 1;
+          
+          // 停止之前的语音（如果有）
+          window.speechSynthesis.cancel();
+          // 开始新的语音播报
+          window.speechSynthesis.speak(utterance);
+        }
+      } catch (error) {
+        console.log('语音播报失败:', error);
+      }
+    },
+    
     // 打开红包
     openPacket() {
       if (this.isOpened) return;
       
       // 选择当前用户
       this.selectRandomUser();
+      
+      // 播放打开红包音效
+      if (this.sounds.openRedPacket) {
+        this.sounds.openRedPacket.play();
+      }
       
       // 标记红包为打开状态（触发动画）
       this.isOpened = true;
@@ -203,11 +300,23 @@ export default {
       
       // 动画结束后显示结果（1.5秒后）
       setTimeout(() => {
+        // 播放显示金额音效
+        if (this.sounds.showMoney) {
+          this.sounds.showMoney.play();
+        }
+        
         // 记录本次抢红包结果
         this.recordResult();
         
+        // 语音播报金额
+        this.speakAmount(this.money, this.currentUser);
+        
         // 检查是否所有红包都已抢完
         if (this.receivedList.length >= this.totalUsers) {
+          // 播放庆祝音效
+          if (this.sounds.celebration) {
+            this.sounds.celebration.play();
+          }
           this.calculateLuckyUsers();
           this.showAllOpened = true;
         } else {
@@ -350,6 +459,11 @@ export default {
     
     // 保存设置
     saveSettings() {
+      // 停止正在进行的语音播报
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      
       // 验证并设置总金额
       if (this.inputMoney) {
         this.totalMoney = Math.min(Math.max(this.inputMoney, 0.01), 200);
